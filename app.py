@@ -9,6 +9,18 @@ from ai_analyzer import analyze_member_tasks
 
 load_dotenv()
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _all_done(result: dict) -> bool:
+    return bool(result["comparison"]) and all(
+        i.get("status") == "done" for i in result["comparison"]
+    )
+
+
+def _any_done(result: dict) -> bool:
+    return any(i.get("status") == "done" for i in result["comparison"])
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 
@@ -101,16 +113,6 @@ with report_tab:
                             st.warning(f"⚠ {task}" + (f" — {note}" if note else ""))
 
             st.write("")  # spacing between members
-
-
-def _all_done(result: dict) -> bool:
-    return bool(result["comparison"]) and all(
-        i.get("status") == "done" for i in result["comparison"]
-    )
-
-
-def _any_done(result: dict) -> bool:
-    return any(i.get("status") == "done" for i in result["comparison"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
