@@ -28,11 +28,11 @@ APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 def check_auth():
     if not APP_PASSWORD:
         return
-    if st.query_params.get("auth") == APP_PASSWORD:
+    if st.session_state.get("authenticated"):
         return
     pwd = st.text_input("Enter password", type="password")
     if pwd == APP_PASSWORD:
-        st.query_params["auth"] = APP_PASSWORD
+        st.session_state["authenticated"] = True
         st.rerun()
     elif pwd:
         st.error("Wrong password")
