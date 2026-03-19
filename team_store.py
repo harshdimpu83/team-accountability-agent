@@ -1,19 +1,39 @@
+import boto3
 import json
 import os
+from botocore.config import Config
 
-TEAM_FILE = os.path.join(os.path.dirname(__file__), "team.json")
+R2_KEY = "team-accountability/team.json"
+
+
+def _client():
+    return boto3.client(
+        service_name="s3",
+        endpoint_url=f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com",
+        aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
+        region_name="auto",
+        config=Config(s3={"addressing_style": "path"}),
+    )
 
 
 def load_team() -> list:
-    if not os.path.exists(TEAM_FILE):
+    try:
+        response = _client().get_object(Bucket=os.getenv("BUCKET_NAME"), Key=R2_KEY)
+        return json.loads(response["Body"].read().decode("utf-8"))
+    except _client().exceptions.NoSuchKey:
         return []
-    with open(TEAM_FILE, "r") as f:
-        return json.load(f)
+    except Exception:
+        return []
 
 
 def save_team(team: list):
-    with open(TEAM_FILE, "w") as f:
-        json.dump(team, f, indent=2)
+    _client().put_object(
+        Bucket=os.getenv("BUCKET_NAME"),
+        Key=R2_KEY,
+        Body=json.dumps(team, indent=2),
+        ContentType="application/json",
+    )
 
 
 def add_member(name: str, email: str):
