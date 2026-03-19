@@ -1,0 +1,44 @@
+name: Daily Reminders
+
+on:
+  schedule:
+    - cron: "0 5 * * 1-5"    # 10:30 IST — morning reminder
+    - cron: "20 13 * * 1-5"  # 18:50 IST — evening reminder
+  workflow_dispatch:           # allow manual trigger for testing
+
+jobs:
+  morning-reminder:
+    if: github.event.schedule == '0 5 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python reminder.py morning
+        env:
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+
+  evening-reminder:
+    if: github.event.schedule == '20 13 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python reminder.py evening
+        env:
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
