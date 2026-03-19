@@ -7,6 +7,9 @@ R2_KEY = "team-accountability/team.json"
 
 
 def _client():
+    missing = [k for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "BUCKET_NAME") if not os.getenv(k)]
+    if missing:
+        raise ValueError(f"Missing Render environment variables: {', '.join(missing)}")
     return boto3.client(
         service_name="s3",
         endpoint_url=f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com",
