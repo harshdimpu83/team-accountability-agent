@@ -21,3 +21,43 @@ services:
         sync: false
       - key: BUCKET_NAME
         sync: false
+
+  - type: cron
+    name: morning-reminder
+    env: python
+    schedule: "0 5 * * 1-5"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python reminder.py morning
+    envVars:
+      - key: GMAIL_EMAIL
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: BUCKET_NAME
+        sync: false
+
+  - type: cron
+    name: evening-reminder
+    env: python
+    schedule: "20 13 * * 1-5"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python reminder.py evening
+    envVars:
+      - key: GMAIL_EMAIL
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: BUCKET_NAME
+        sync: false
