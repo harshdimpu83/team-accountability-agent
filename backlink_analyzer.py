@@ -188,8 +188,8 @@ Return ONLY valid JSON (no markdown, no extra text):
   "quality_score": 7,
   "quality_label": "Good",
   "html_structure": {{
-    "h1": "✅ 1 found" or "❌ Missing" or "⚠️ Multiple ({n} found)",
-    "h2": "✅ {n} found" or "❌ Missing",
+    "h1": "✅ 1 found" or "❌ Missing" or "⚠️ Multiple ({{n}} found)",
+    "h2": "✅ {{n}} found" or "❌ Missing",
     "meta_title": "✅ Present" or "❌ Missing",
     "meta_description": "✅ Present" or "❌ Missing",
     "canonical": "✅ Set" or "⚠️ Not set",
