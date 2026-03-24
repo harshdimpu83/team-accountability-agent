@@ -49,14 +49,18 @@ def filter_backlinks(df: pd.DataFrame, start_date: date, end_date: date) -> pd.D
         rename[cols[3]] = "url"
     df = df.rename(columns=rename)
 
-    # Try multiple date formats to handle "8 Aug 2023", "08/08/2023", Excel serial dates, etc.
-    df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
-    # For any rows that failed, try with infer_datetime_format on the original string
-    failed_mask = df["date"].isna()
-    if failed_mask.any():
-        df.loc[failed_mask, "date"] = pd.to_datetime(
-            df.loc[failed_mask, "date"].astype(str), errors="coerce", format="mixed", dayfirst=True
-        )
+    # Handle known formats: "21-Mar-2026" and "11 Aug 2023"
+    raw = df["date"].astype(str)
+    parsed = None
+    for fmt in ("%d-%b-%Y", "%d %b %Y", "%d/%m/%Y", "%Y-%m-%d"):
+        attempt = pd.to_datetime(raw, format=fmt, errors="coerce")
+        if parsed is None:
+            parsed = attempt
+        else:
+            parsed = parsed.fillna(attempt)
+    # Final fallback for any remaining unparsed values
+    parsed = parsed.fillna(pd.to_datetime(raw, errors="coerce", dayfirst=True))
+    df["date"] = parsed
     df = df.dropna(subset=["date"])
 
     # Keep only rows that have a URL starting with http
