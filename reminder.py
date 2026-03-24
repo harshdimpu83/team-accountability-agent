@@ -41,7 +41,9 @@ def send_email(to_email: str, to_name: str, subject: str, body: str):
     msg["From"] = GMAIL_EMAIL
     msg["To"] = to_email
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.ehlo()
+        server.starttls()
         server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_EMAIL, to_email, msg.as_string())
     print(f"✓ Reminder sent to {to_name} <{to_email}>")

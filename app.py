@@ -121,7 +121,9 @@ def _send_backlink_report(member_name, member_email, results, from_date, to_date
         msg["Cc"] = gmail_user
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.ehlo()
+        server.starttls()
         server.login(gmail_user, gmail_pass)
         server.sendmail(gmail_user, recipients, msg.as_string())
 
