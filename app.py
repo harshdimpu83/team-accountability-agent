@@ -159,7 +159,7 @@ with backlink_tab:
     with col_member:
         selected_member = st.selectbox("Team Member", ["All members"] + member_names)
     with col_from:
-        from_date = st.date_input("From", value=date.today().replace(day=1), key="bl_from")
+        from_date = st.date_input("From", value=date(2023, 1, 1), key="bl_from")
     with col_to:
         to_date = st.date_input("To", value=date.today(), key="bl_to")
     with col_run:
@@ -207,7 +207,11 @@ with backlink_tab:
             filtered = filter_backlinks(df, from_date, to_date)
 
             if filtered.empty:
-                st.info(f"No backlinks found for **{member_name}** in the selected date range.")
+                total_rows = len(df.dropna(how="all"))
+                st.info(
+                    f"No backlinks found for **{member_name}** between {from_date} and {to_date}. "
+                    f"(Sheet has {total_rows} total rows — check the date range matches your data.)"
+                )
                 continue
 
             st.caption(f"{len(filtered)} backlink(s) found — analysing...")
