@@ -6,6 +6,7 @@ import re
 import google.generativeai as genai
 import pandas as pd
 import requests
+import streamlit as st
 from bs4 import BeautifulSoup
 from datetime import date
 
@@ -24,8 +25,10 @@ _FETCH_TIMEOUT = 15
 
 # ── Sheet reading ─────────────────────────────────────────────────────────────
 
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_all_sheets(sheet_url: str) -> dict:
-    """Download Google Sheet as XLSX → dict of {sheet_name: DataFrame}."""
+    """Download Google Sheet as XLSX → dict of {sheet_name: DataFrame}.
+    Cached for 5 minutes — use fetch_all_sheets.clear() to force a reload."""
     sheet_id = _extract_sheet_id(sheet_url)
     export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     resp = requests.get(export_url, timeout=30)

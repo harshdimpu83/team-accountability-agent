@@ -155,7 +155,7 @@ with backlink_tab:
     member_names = [m["name"] for m in team]
     member_email_map = {m["name"]: m["email"] for m in team}
 
-    col_member, col_from, col_to, col_run = st.columns([2, 1.5, 1.5, 1])
+    col_member, col_from, col_to, col_run, col_refresh = st.columns([2, 1.5, 1.5, 1, 1])
     with col_member:
         selected_member = st.selectbox("Team Member", ["All members"] + member_names)
     with col_from:
@@ -165,6 +165,11 @@ with backlink_tab:
     with col_run:
         st.write("")  # vertical alignment
         run_analysis = st.button("🔍 Analyse", type="primary", use_container_width=True)
+    with col_refresh:
+        st.write("")  # vertical alignment
+        if st.button("🔄 Refresh", use_container_width=True, help="Force reload the Google Sheet"):
+            fetch_all_sheets.clear()
+            st.toast("Sheet cache cleared — next analysis will reload from Google.")
 
     if run_analysis:
         if from_date > to_date:
