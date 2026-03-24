@@ -52,18 +52,18 @@ def filter_backlinks(df: pd.DataFrame, start_date: date, end_date: date) -> pd.D
         rename[cols[3]] = "url"
     df = df.rename(columns=rename)
 
-    # Handle known formats: "21-Mar-2026" and "11 Aug 2023"
-    raw = df["date"].astype(str)
-    parsed = None
-    for fmt in ("%d-%b-%Y", "%d %b %Y", "%d/%m/%Y", "%Y-%m-%d"):
-        attempt = pd.to_datetime(raw, format=fmt, errors="coerce")
-        if parsed is None:
-            parsed = attempt
-        else:
-            parsed = parsed.fillna(attempt)
-    # Final fallback for any remaining unparsed values
-    parsed = parsed.fillna(pd.to_datetime(raw, errors="coerce", dayfirst=True))
-    df["date"] = parsed
+    # Drop repeated header rows pasted mid-sheet (e.g. a row with "Date" as the date value)
+    df = df[~df["date"].astype(str).str.strip().str.lower().isin(["date", "dates"])]
+
+    # Parse dates — handles Excel datetime objects directly AND text like "21-Mar-2026" / "11 Aug 2023"
+    # Do NOT convert to string first — that breaks Excel datetime objects
+    df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
+
+    # Forward-fill to handle merged date cells in Google Sheets —
+    # when a date cell is merged across multiple rows, only the first row gets the value;
+    # all rows below it appear as NaN but belong to the same date
+    df["date"] = df["date"].ffill()
+
     df = df.dropna(subset=["date"])
 
     if "url" not in df.columns:
