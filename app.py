@@ -54,6 +54,77 @@ st.caption("Check if your team completed what they planned.")
 
 report_tab, backlink_tab, team_tab = st.tabs(["📊 Daily Report", "🔗 Backlink Analysis", "👥 Team"])
 
+
+# ── Email helper (defined before tabs so it's available when buttons are clicked) ──
+
+def _send_backlink_report(member_name, member_email, results, from_date, to_date):
+    gmail_user = os.getenv("GMAIL_EMAIL")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        raise ValueError("GMAIL_EMAIL or GMAIL_APP_PASSWORD not set in environment.")
+
+    subject = f"Backlink Analysis Report — {member_name} ({from_date} to {to_date})"
+
+    rows_html = ""
+    for r in results:
+        a = r["analysis"]
+        score = a.get("quality_score", 0)
+        label = a.get("quality_label", "")
+        color = "#28a745" if score >= 8 else ("#fd7e14" if score >= 6 else "#dc3545")
+        suggestions = "<br>".join(f"• {s}" for s in a.get("suggestions", []))
+        issues = "<br>".join(f"• {s}" for s in a.get("issues", []))
+        rows_html += f"""
+        <tr>
+          <td style="padding:8px;border:1px solid #ddd;">{r['date']}</td>
+          <td style="padding:8px;border:1px solid #ddd;">{r['type']}</td>
+          <td style="padding:8px;border:1px solid #ddd;word-break:break-all;">
+            <a href="{r['url']}">{r['url'][:60]}...</a>
+          </td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;">
+            <strong style="color:{color};">{score}/10 ({label})</strong>
+          </td>
+          <td style="padding:8px;border:1px solid #ddd;">{issues or '—'}</td>
+          <td style="padding:8px;border:1px solid #ddd;">{suggestions or '—'}</td>
+        </tr>"""
+
+    html_body = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#333;">
+    <h2>Backlink Analysis Report</h2>
+    <p><strong>Team Member:</strong> {member_name}</p>
+    <p><strong>Period:</strong> {from_date} to {to_date}</p>
+    <p><strong>Total Backlinks Reviewed:</strong> {len(results)}</p>
+    <table style="border-collapse:collapse;width:100%;font-size:13px;">
+      <thead style="background:#f2f2f2;">
+        <tr>
+          <th style="padding:8px;border:1px solid #ddd;">Date</th>
+          <th style="padding:8px;border:1px solid #ddd;">Type</th>
+          <th style="padding:8px;border:1px solid #ddd;">URL</th>
+          <th style="padding:8px;border:1px solid #ddd;">Score</th>
+          <th style="padding:8px;border:1px solid #ddd;">Issues</th>
+          <th style="padding:8px;border:1px solid #ddd;">Suggestions</th>
+        </tr>
+      </thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    <br><p style="color:#888;font-size:12px;">Sent by Team Accountability Agent</p>
+    </body></html>"""
+
+    recipients = [member_email]
+    if gmail_user.lower() != member_email.lower():
+        recipients.append(gmail_user)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = gmail_user
+    msg["To"] = member_email
+    if gmail_user.lower() != member_email.lower():
+        msg["Cc"] = gmail_user
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(gmail_user, gmail_pass)
+        server.sendmail(gmail_user, recipients, msg.as_string())
+
 # ══════════════════════════════════════════════════════════════════════════════
 # REPORT TAB
 # ══════════════════════════════════════════════════════════════════════════════
@@ -311,76 +382,6 @@ with backlink_tab:
                             st.success(f"Report sent to {member_email}")
                         except Exception as e:
                             st.error(f"Failed to send email: {e}")
-
-
-def _send_backlink_report(member_name, member_email, results, from_date, to_date):
-    gmail_user = os.getenv("GMAIL_EMAIL")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
-    if not gmail_user or not gmail_pass:
-        raise ValueError("GMAIL_EMAIL or GMAIL_APP_PASSWORD not set in environment.")
-
-    subject = f"Backlink Analysis Report — {member_name} ({from_date} to {to_date})"
-
-    rows_html = ""
-    for r in results:
-        a = r["analysis"]
-        score = a.get("quality_score", 0)
-        label = a.get("quality_label", "")
-        color = "#28a745" if score >= 8 else ("#fd7e14" if score >= 6 else "#dc3545")
-        suggestions = "<br>".join(f"• {s}" for s in a.get("suggestions", []))
-        issues = "<br>".join(f"• {s}" for s in a.get("issues", []))
-        rows_html += f"""
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;">{r['date']}</td>
-          <td style="padding:8px;border:1px solid #ddd;">{r['type']}</td>
-          <td style="padding:8px;border:1px solid #ddd;word-break:break-all;">
-            <a href="{r['url']}">{r['url'][:60]}...</a>
-          </td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;">
-            <strong style="color:{color};">{score}/10 ({label})</strong>
-          </td>
-          <td style="padding:8px;border:1px solid #ddd;">{issues or '—'}</td>
-          <td style="padding:8px;border:1px solid #ddd;">{suggestions or '—'}</td>
-        </tr>"""
-
-    html_body = f"""
-    <html><body style="font-family:Arial,sans-serif;color:#333;">
-    <h2>Backlink Analysis Report</h2>
-    <p><strong>Team Member:</strong> {member_name}</p>
-    <p><strong>Period:</strong> {from_date} to {to_date}</p>
-    <p><strong>Total Backlinks Reviewed:</strong> {len(results)}</p>
-    <table style="border-collapse:collapse;width:100%;font-size:13px;">
-      <thead style="background:#f2f2f2;">
-        <tr>
-          <th style="padding:8px;border:1px solid #ddd;">Date</th>
-          <th style="padding:8px;border:1px solid #ddd;">Type</th>
-          <th style="padding:8px;border:1px solid #ddd;">URL</th>
-          <th style="padding:8px;border:1px solid #ddd;">Score</th>
-          <th style="padding:8px;border:1px solid #ddd;">Issues</th>
-          <th style="padding:8px;border:1px solid #ddd;">Suggestions</th>
-        </tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
-    </table>
-    <br><p style="color:#888;font-size:12px;">Sent by Team Accountability Agent</p>
-    </body></html>"""
-
-    recipients = [member_email]
-    # CC yourself only if different from the recipient
-    if gmail_user.lower() != member_email.lower():
-        recipients.append(gmail_user)
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = gmail_user
-    msg["To"] = member_email
-    if gmail_user.lower() != member_email.lower():
-        msg["Cc"] = gmail_user
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(gmail_user, gmail_pass)
-        server.sendmail(gmail_user, recipients, msg.as_string())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
