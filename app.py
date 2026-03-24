@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from datetime import date
+from datetime import date, timedelta
 from dotenv import load_dotenv
 
 import smtplib
@@ -230,7 +230,7 @@ with backlink_tab:
     with col_member:
         selected_member = st.selectbox("Team Member", ["All members"] + member_names)
     with col_from:
-        from_date = st.date_input("From", value=date(2023, 1, 1), key="bl_from")
+        from_date = st.date_input("From", value=date.today() - timedelta(days=1), key="bl_from")
     with col_to:
         to_date = st.date_input("To", value=date.today(), key="bl_to")
     with col_run:
@@ -275,7 +275,14 @@ with backlink_tab:
             st.warning("No matching sheets found. Check that sheet tab names match team member names.")
             st.stop()
 
-        # ── Process each member ──
+        # ── Process each member and save to session_state ──
+        st.session_state["bl_results"] = {}
+        st.session_state["bl_meta"] = {
+            "from_date": from_date,
+            "to_date": to_date,
+            "member_email_map": member_email_map,
+        }
+
         for member_name, df in sheets_to_check.items():
             st.divider()
             st.markdown(f"### 👤 {member_name}")
@@ -294,8 +301,8 @@ with backlink_tab:
 
             results = []
             progress = st.progress(0)
-
             total = len(filtered)
+
             for counter, (_, row) in enumerate(filtered.iterrows(), start=1):
                 url = str(row.get("url", ""))
                 bl_type = str(row.get("type", "Unknown"))
@@ -332,13 +339,23 @@ with backlink_tab:
                 progress.progress(counter / total)
 
             progress.empty()
+            st.session_state["bl_results"][member_name] = results
 
-            # ── Display results ──
+    # ── Display results from session_state (persists when email button is clicked) ──
+    if st.session_state.get("bl_results"):
+        meta = st.session_state.get("bl_meta", {})
+        saved_from = meta.get("from_date", "")
+        saved_to = meta.get("to_date", "")
+        saved_email_map = meta.get("member_email_map", {})
+
+        for member_name, results in st.session_state["bl_results"].items():
+            st.divider()
+            st.markdown(f"### 👤 {member_name}")
+
             for r in results:
                 a = r["analysis"]
                 score = a.get("quality_score", 0)
                 label = a.get("quality_label", "Unknown")
-                color = score_color(score)
 
                 with st.expander(
                     f"**{r['type']}** — {r['url'][:70]}  |  Score: {score}/10 ({label})",
@@ -372,14 +389,14 @@ with backlink_tab:
                         for s in a.get("suggestions", []):
                             st.markdown(f"- {s}")
 
-            # ── Email report button ──
-            member_email = member_email_map.get(member_name)
+            # ── Email button — outside if run_analysis so it works after rerun ──
+            member_email = saved_email_map.get(member_name)
             if member_email and results:
                 if st.button(f"📧 Email Report to {member_name}", key=f"email_{member_name}"):
                     with st.spinner("Sending email..."):
                         try:
-                            _send_backlink_report(member_name, member_email, results, from_date, to_date)
-                            st.success(f"Report sent to {member_email}")
+                            _send_backlink_report(member_name, member_email, results, saved_from, saved_to)
+                            st.success(f"✅ Report sent to {member_email} (CC: {os.getenv('GMAIL_EMAIL')})")
                         except Exception as e:
                             st.error(f"Failed to send email: {e}")
 
