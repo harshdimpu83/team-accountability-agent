@@ -219,13 +219,14 @@ with backlink_tab:
             results = []
             progress = st.progress(0)
 
-            for idx, row in filtered.iterrows():
+            total = len(filtered)
+            for counter, (_, row) in enumerate(filtered.iterrows(), start=1):
                 url = str(row.get("url", ""))
                 bl_type = str(row.get("type", "Unknown"))
                 project = str(row.get("project", ""))
                 bl_date = str(row.get("date", ""))[:10]
 
-                with st.spinner(f"Checking {url[:60]}..."):
+                with st.spinner(f"[{counter}/{total}] Checking {url[:60]}..."):
                     page_data = fetch_page_data(url)
                     analysis = analyze_backlink(row.to_dict(), page_data)
 
@@ -237,7 +238,7 @@ with backlink_tab:
                     "page_data": page_data,
                     "analysis": analysis,
                 })
-                progress.progress((idx + 1) / len(filtered))
+                progress.progress(counter / total)
 
             progress.empty()
 
@@ -295,6 +296,8 @@ with backlink_tab:
 def _send_backlink_report(member_name, member_email, results, from_date, to_date):
     gmail_user = os.getenv("GMAIL_EMAIL")
     gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        raise ValueError("GMAIL_EMAIL or GMAIL_APP_PASSWORD not set in environment.")
 
     subject = f"Backlink Analysis Report — {member_name} ({from_date} to {to_date})"
 
@@ -342,15 +345,22 @@ def _send_backlink_report(member_name, member_email, results, from_date, to_date
     <br><p style="color:#888;font-size:12px;">Sent by Team Accountability Agent</p>
     </body></html>"""
 
+    recipients = [member_email]
+    # CC yourself only if different from the recipient
+    if gmail_user.lower() != member_email.lower():
+        recipients.append(gmail_user)
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = gmail_user
     msg["To"] = member_email
+    if gmail_user.lower() != member_email.lower():
+        msg["Cc"] = gmail_user
     msg.attach(MIMEText(html_body, "html"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(gmail_user, gmail_pass)
-        server.sendmail(gmail_user, member_email, msg.as_string())
+        server.sendmail(gmail_user, recipients, msg.as_string())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
