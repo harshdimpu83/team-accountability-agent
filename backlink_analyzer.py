@@ -63,11 +63,11 @@ def filter_backlinks(df: pd.DataFrame, start_date: date, end_date: date) -> pd.D
     df["date"] = parsed
     df = df.dropna(subset=["date"])
 
-    # Keep only rows that have a URL starting with http
-    if "url" in df.columns:
-        df = df[df["url"].astype(str).str.startswith("http")]
-    else:
+    if "url" not in df.columns:
         return pd.DataFrame()
+
+    # Mark whether each row has a real URL (starts with http)
+    df["has_url"] = df["url"].astype(str).str.startswith("http")
 
     mask = (df["date"].dt.date >= start_date) & (df["date"].dt.date <= end_date)
     return df[mask].reset_index(drop=True)

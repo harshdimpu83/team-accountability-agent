@@ -225,18 +225,33 @@ with backlink_tab:
                 bl_type = str(row.get("type", "Unknown"))
                 project = str(row.get("project", ""))
                 bl_date = str(row.get("date", ""))[:10]
+                has_url = bool(row.get("has_url", False))
 
-                with st.spinner(f"[{counter}/{total}] Checking {url[:60]}..."):
-                    page_data = fetch_page_data(url)
-                    analysis = analyze_backlink(row.to_dict(), page_data)
+                if has_url:
+                    with st.spinner(f"[{counter}/{total}] Checking {url[:60]}..."):
+                        page_data = fetch_page_data(url)
+                        analysis = analyze_backlink(row.to_dict(), page_data)
+                else:
+                    page_data = {"reachable": False, "error": "No URL provided"}
+                    analysis = {
+                        "type_assessment": f"No URL entered for this {bl_type} entry.",
+                        "quality_score": 0,
+                        "quality_label": "No URL",
+                        "html_structure": {},
+                        "strengths": [],
+                        "issues": ["No URL in the sheet for this entry"],
+                        "suggestions": ["Ask the team member to add the published URL"],
+                        "verdict": "Cannot analyse — no URL provided",
+                    }
 
                 results.append({
-                    "url": url,
+                    "url": url if has_url else "(no URL)",
                     "type": bl_type,
                     "project": project,
                     "date": bl_date,
                     "page_data": page_data,
                     "analysis": analysis,
+                    "has_url": has_url,
                 })
                 progress.progress(counter / total)
 
