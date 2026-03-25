@@ -3,9 +3,7 @@ import os
 from datetime import date, timedelta
 from dotenv import load_dotenv
 
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import requests as http_requests
 
 from team_store import load_team, add_member, update_member, delete_member
 from gmail_reader import fetch_emails_for_member, classify_emails
@@ -58,10 +56,10 @@ report_tab, backlink_tab, team_tab = st.tabs(["📊 Daily Report", "🔗 Backlin
 # ── Email helper (defined before tabs so it's available when buttons are clicked) ──
 
 def _send_backlink_report(member_name, member_email, results, from_date, to_date):
-    gmail_user = os.getenv("GMAIL_EMAIL")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
-    if not gmail_user or not gmail_pass:
-        raise ValueError("GMAIL_EMAIL or GMAIL_APP_PASSWORD not set in environment.")
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("GMAIL_EMAIL")
+    if not api_key or not sender_email:
+        raise ValueError("BREVO_API_KEY or GMAIL_EMAIL not set in environment.")
 
     subject = f"Backlink Analysis Report — {member_name} ({from_date} to {to_date})"
 
@@ -109,23 +107,28 @@ def _send_backlink_report(member_name, member_email, results, from_date, to_date
     <br><p style="color:#888;font-size:12px;">Sent by Team Accountability Agent</p>
     </body></html>"""
 
-    recipients = [member_email]
-    if gmail_user.lower() != member_email.lower():
-        recipients.append(gmail_user)
+    to_list = [{"email": member_email}]
+    cc_list = []
+    if sender_email.lower() != member_email.lower():
+        cc_list = [{"email": sender_email}]
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = gmail_user
-    msg["To"] = member_email
-    if gmail_user.lower() != member_email.lower():
-        msg["Cc"] = gmail_user
-    msg.attach(MIMEText(html_body, "html"))
+    payload = {
+        "sender": {"name": "Team Accountability Agent", "email": sender_email},
+        "to": to_list,
+        "subject": subject,
+        "htmlContent": html_body,
+    }
+    if cc_list:
+        payload["cc"] = cc_list
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(gmail_user, gmail_pass)
-        server.sendmail(gmail_user, recipients, msg.as_string())
+    resp = http_requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": api_key, "Content-Type": "application/json"},
+        json=payload,
+        timeout=15,
+    )
+    if resp.status_code not in (200, 201):
+        raise ValueError(f"Brevo error {resp.status_code}: {resp.text}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # REPORT TAB

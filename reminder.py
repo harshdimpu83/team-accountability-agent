@@ -5,8 +5,7 @@ Usage: python reminder.py morning
 """
 import os
 import sys
-import smtplib
-from email.mime.text import MIMEText
+import requests
 from datetime import date
 from dotenv import load_dotenv
 
@@ -16,7 +15,7 @@ from team_store import load_team
 from gmail_reader import fetch_emails_for_member, classify_emails
 
 GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 
 MORNING_SUBJECT = "Reminder: Please send your daily plan"
 MORNING_BODY = (
@@ -36,16 +35,20 @@ EVENING_BODY = (
 
 
 def send_email(to_email: str, to_name: str, subject: str, body: str):
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = GMAIL_EMAIL
-    msg["To"] = to_email
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_EMAIL, to_email, msg.as_string())
+    payload = {
+        "sender": {"name": "Team Accountability Agent", "email": GMAIL_EMAIL},
+        "to": [{"email": to_email, "name": to_name}],
+        "subject": subject,
+        "textContent": body,
+    }
+    resp = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json"},
+        json=payload,
+        timeout=15,
+    )
+    if resp.status_code not in (200, 201):
+        raise ValueError(f"Brevo error {resp.status_code}: {resp.text}")
     print(f"✓ Reminder sent to {to_name} <{to_email}>")
 
 
