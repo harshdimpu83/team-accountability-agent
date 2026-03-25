@@ -14,8 +14,8 @@ load_dotenv()
 from team_store import load_team
 from gmail_reader import fetch_emails_for_member, classify_emails
 
-GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "sales@vyasharsh.com")
 
 MORNING_SUBJECT = "Reminder: Please send your daily plan"
 MORNING_BODY = (
@@ -36,7 +36,7 @@ EVENING_BODY = (
 
 def send_email(to_email: str, to_name: str, subject: str, body: str):
     payload = {
-        "sender": {"name": "Team Accountability Agent", "email": GMAIL_EMAIL},
+        "sender": {"name": "Team Accountability Agent", "email": BREVO_SENDER_EMAIL},
         "to": [{"email": to_email, "name": to_name}],
         "subject": subject,
         "textContent": body,

@@ -57,9 +57,10 @@ report_tab, backlink_tab, team_tab = st.tabs(["📊 Daily Report", "🔗 Backlin
 
 def _send_backlink_report(member_name, member_email, results, from_date, to_date):
     api_key = os.getenv("BREVO_API_KEY")
-    sender_email = os.getenv("GMAIL_EMAIL")
-    if not api_key or not sender_email:
-        raise ValueError("BREVO_API_KEY or GMAIL_EMAIL not set in environment.")
+    sender_email = os.getenv("BREVO_SENDER_EMAIL", "sales@vyasharsh.com")
+    cc_email = os.getenv("GMAIL_EMAIL")
+    if not api_key:
+        raise ValueError("BREVO_API_KEY not set in environment.")
 
     subject = f"Backlink Analysis Report — {member_name} ({from_date} to {to_date})"
 
@@ -109,8 +110,8 @@ def _send_backlink_report(member_name, member_email, results, from_date, to_date
 
     to_list = [{"email": member_email}]
     cc_list = []
-    if sender_email.lower() != member_email.lower():
-        cc_list = [{"email": sender_email}]
+    if cc_email and cc_email.lower() != member_email.lower():
+        cc_list = [{"email": cc_email}]
 
     payload = {
         "sender": {"name": "Team Accountability Agent", "email": sender_email},
