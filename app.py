@@ -109,9 +109,10 @@ def _send_backlink_report(member_name, member_email, results, from_date, to_date
     </body></html>"""
 
     to_list = [{"email": member_email}]
-    cc_list = []
+    cc_emails = ["tbmseoteam@gmail.com"]
     if cc_email and cc_email.lower() != member_email.lower():
-        cc_list = [{"email": cc_email}]
+        cc_emails.append(cc_email)
+    cc_list = [{"email": e} for e in cc_emails if e.lower() != member_email.lower()]
 
     payload = {
         "sender": {"name": "Team Accountability Agent", "email": sender_email},
