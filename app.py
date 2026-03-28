@@ -10,6 +10,8 @@ from gmail_reader import fetch_emails_for_member, classify_emails
 from ai_analyzer import analyze_member_tasks
 from backlink_analyzer import fetch_all_sheets, filter_backlinks, fetch_page_data, analyze_backlink, score_color
 from settings_store import load_settings, save_settings
+from chat_store import load_chat, save_chat, clear_chat
+from chat_assistant import build_context, get_response
 
 load_dotenv()
 
@@ -50,7 +52,7 @@ check_auth()
 st.title("📋 Team Accountability Agent")
 st.caption("Check if your team completed what they planned.")
 
-report_tab, backlink_tab, team_tab = st.tabs(["📊 Daily Report", "🔗 Backlink Analysis", "👥 Team"])
+report_tab, backlink_tab, chat_tab, team_tab = st.tabs(["📊 Daily Report", "🔗 Backlink Analysis", "💬 Chat", "👥 Team"])
 
 
 # ── Email helper (defined before tabs so it's available when buttons are clicked) ──
@@ -364,8 +366,9 @@ with backlink_tab:
                 score = a.get("quality_score", 0)
                 label = a.get("quality_label", "Unknown")
 
+                detected = a.get("detected_type", r["type"])
                 with st.expander(
-                    f"**{r['type']}** — {r['url'][:70]}  |  Score: {score}/10 ({label})",
+                    f"**{detected}** — {r['url'][:65]}  |  Score: {score}/10 ({label})",
                     expanded=False,
                 ):
                     col_score, col_verdict = st.columns([1, 4])
@@ -374,14 +377,34 @@ with backlink_tab:
                         st.markdown(f"**{label}**")
                     with col_verdict:
                         st.markdown(f"**Verdict:** {a.get('verdict', '')}")
-                        st.markdown(f"*{a.get('type_assessment', '')}*")
+                        st.caption(a.get("type_assessment", ""))
 
-                    st.markdown("**HTML Structure**")
+                    # ── Type-specific checklist ──
+                    checklist = a.get("checklist", {})
+                    if checklist:
+                        st.markdown("**📋 Type Checklist**")
+                        cl_cols = st.columns(2)
+                        for i, (item, status) in enumerate(checklist.items()):
+                            cl_cols[i % 2].markdown(f"**{item}:** {status}")
+
+                    # ── SEO signals ──
+                    seo_sig = a.get("seo_signals", {})
+                    if seo_sig:
+                        st.markdown("**🔍 SEO Signals**")
+                        sig_cols = st.columns(4)
+                        signal_items = list(seo_sig.items())
+                        for i, (key, val) in enumerate(signal_items):
+                            sig_cols[i % 4].markdown(f"**{key.replace('_', ' ').title()}:** {val}")
+
+                    # ── HTML structure ──
                     html_s = a.get("html_structure", {})
-                    cols = st.columns(3)
-                    for i, (key, val) in enumerate(html_s.items()):
-                        cols[i % 3].markdown(f"**{key.replace('_', ' ').title()}:** {val}")
+                    if html_s:
+                        st.markdown("**🏗️ HTML Structure**")
+                        h_cols = st.columns(3)
+                        for i, (key, val) in enumerate(html_s.items()):
+                            h_cols[i % 3].markdown(f"**{key.replace('_', ' ').title()}:** {val}")
 
+                    st.divider()
                     col_str, col_iss, col_sug = st.columns(3)
                     with col_str:
                         st.markdown("**✅ Strengths**")
@@ -406,6 +429,102 @@ with backlink_tab:
                             st.success(f"✅ Report sent to {member_email} (CC: {os.getenv('GMAIL_EMAIL')})")
                         except Exception as e:
                             st.error(f"Failed to send email: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAT TAB
+# ══════════════════════════════════════════════════════════════════════════════
+with chat_tab:
+    st.subheader("💬 AI Assistant")
+    st.caption("Ask questions about your team, backlink results, or get SEO advice.")
+
+    # Load today's chat history from R2 into session_state (once per session)
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = load_chat(date.today())
+
+    # ── Clear chat button ──
+    col_title, col_clear = st.columns([5, 1])
+    with col_clear:
+        if st.button("🗑️ Clear", key="clear_chat_btn", use_container_width=True):
+            st.session_state["chat_history"] = []
+            clear_chat(date.today())
+            st.rerun()
+
+    # ── Render existing messages ──
+    for msg in st.session_state["chat_history"]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # ── Chat input ──
+    user_input = st.chat_input("Ask me anything — team, backlinks, SEO advice...")
+
+    if user_input:
+        # Add user message
+        st.session_state["chat_history"].append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        # Build context from current app state
+        context = build_context(
+            load_team(),
+            st.session_state.get("bl_results", {}),
+        )
+
+        # Get AI response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    reply, action = get_response(
+                        st.session_state["chat_history"], user_input, context
+                    )
+                except Exception as e:
+                    reply = f"Sorry, I ran into an error: {e}"
+                    action = None
+
+            st.markdown(reply)
+
+        st.session_state["chat_history"].append({"role": "assistant", "content": reply})
+
+        # ── Execute action if triggered ──
+        if action:
+            action_type = action.get("type")
+
+            if action_type == "send_email":
+                member_name = action.get("member", "")
+                team = load_team()
+                email_map = {m["name"].lower(): m["email"] for m in team}
+                member_email = email_map.get(member_name.lower())
+                bl_results = st.session_state.get("bl_results", {})
+
+                # Find closest matching member name
+                if not member_email:
+                    for name, email in email_map.items():
+                        if member_name.lower() in name or name in member_name.lower():
+                            member_email = email
+                            member_name = next(m["name"] for m in team if m["email"] == email)
+                            break
+
+                if member_email and member_name in bl_results:
+                    try:
+                        meta = st.session_state.get("bl_meta", {})
+                        _send_backlink_report(
+                            member_name, member_email,
+                            bl_results[member_name],
+                            meta.get("from_date", ""), meta.get("to_date", ""),
+                        )
+                        st.success(f"✅ Report sent to {member_email}")
+                    except Exception as e:
+                        st.error(f"Failed to send email: {e}")
+                else:
+                    st.warning(f"Could not send — no backlink results found for '{member_name}'. Run the analysis first.")
+
+            elif action_type == "clear_chat":
+                st.session_state["chat_history"] = []
+                clear_chat(date.today())
+                st.rerun()
+
+        # Save updated history to R2
+        save_chat(date.today(), st.session_state["chat_history"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
