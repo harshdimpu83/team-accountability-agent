@@ -410,7 +410,7 @@ Return ONLY valid JSON (no markdown, no extra text):
   "seo_signals": {{
     "link_type": "Dofollow" or "Nofollow" or "Unknown",
     "indexable": "✅ Indexable" or "❌ Not indexable — no SEO value" or "Unknown",
-    "load_speed": "{speed_label}",
+    "load_speed": "{{speed_label}}",
     "spam_signals": "None detected" or "⚠️ specific signal found"
   }},
   "html_structure": {{
