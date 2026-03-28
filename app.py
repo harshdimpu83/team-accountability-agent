@@ -275,6 +275,12 @@ def render_dashboard():
     st.title("📈 Dashboard")
     st.caption("Overview of your team and backlink performance.")
 
+    st.info(
+        "🤖 **Auto Backlink Analysis is active** — runs every working day at 9:30 AM IST "
+        "(Mon–Fri + 1st/3rd Saturday). Reports are emailed automatically. "
+        "Sundays and 2nd/4th Saturdays are skipped."
+    )
+
     team = load_team()
 
     # ── Section 1: Team Daily Status ──────────────────────────────────────────
