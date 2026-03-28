@@ -16,6 +16,10 @@ You have two roles:
 CONTEXT (current app state):
 {context}
 
+LEARNINGS FROM PAST CONVERSATIONS:
+{learnings}
+(These are patterns observed over time — use them to give better, more personalised responses)
+
 CAPABILITIES YOU CAN TRIGGER:
 If the user asks you to perform an action, include this at the END of your response:
 [ACTION: {{"type": "send_email", "member": "member name"}}] — to send a backlink report email
@@ -51,7 +55,7 @@ def build_context(team: list, bl_results: dict) -> str:
             avg_score = round(sum(r["analysis"]["quality_score"] for r in scored) / len(scored), 1) if scored else 0
             poor = [r for r in results if r.get("analysis", {}).get("quality_score", 0) < 6]
             lines.append(f"  {member}: {len(results)} backlinks analysed, avg score {avg_score}/10, {len(poor)} below 6/10")
-            for r in results[:5]:  # show first 5 per member
+            for r in results[:5]:
                 a = r.get("analysis", {})
                 lines.append(f"    • [{r.get('type','?')}] {r.get('url','')[:60]} — {a.get('quality_score','?')}/10 ({a.get('quality_label','?')})")
     else:
@@ -60,14 +64,74 @@ def build_context(team: list, bl_results: dict) -> str:
     return "\n".join(lines)
 
 
-def get_response(history: list, user_msg: str, context: str) -> tuple:
+def extract_learnings(history: list) -> list:
     """
-    Send message to Gemini with full context and history.
+    Review a day's chat history and extract reusable learnings about Harsh's
+    preferences, corrections, and patterns. Returns a list of short strings.
+    """
+    if not history:
+        return []
+
+    # Format history as readable text
+    conversation = "\n".join(
+        f"{msg['role'].upper()}: {msg['content']}" for msg in history
+    )
+
+    prompt = f"""You are reviewing a chat conversation between an AI assistant and Harsh — a non-technical founder who manages an SEO team.
+
+CONVERSATION:
+{conversation}
+
+Your task: Extract specific, reusable learnings that will help the AI give better responses to Harsh in future sessions.
+
+Focus on:
+- Communication preferences (how he likes info presented)
+- Topics or team members he asks about most
+- Things the AI got wrong or that Harsh corrected
+- SEO topics and strategies he cares about
+- Shortcuts or patterns (e.g. he always checks backlinks on Mondays)
+- Any frustrations or praise about how the AI responded
+
+Rules:
+- Only extract learnings that are clearly supported by the conversation
+- Each learning must be a short, actionable sentence (under 20 words)
+- Skip generic observations — only specific, useful insights
+- If the conversation has nothing useful, return an empty list
+
+Return ONLY a valid JSON array of strings. Example:
+["Harsh prefers bullet points over paragraphs", "Darshan is checked most frequently for backlinks"]
+
+Return [] if nothing useful was found."""
+
+    try:
+        response = _model.generate_content(prompt)
+        raw = response.text.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+        result = json.loads(raw)
+        return [l for l in result if isinstance(l, str) and l.strip()]
+    except Exception:
+        return []
+
+
+def get_response(history: list, user_msg: str, context: str, learnings: list = None) -> tuple:
+    """
+    Send message to Gemini with full context, history, and learnings.
     Returns (assistant_text, action_dict_or_None).
     """
-    system = _SYSTEM_PROMPT.replace("{context}", context)
+    if learnings:
+        learnings_text = "\n".join(f"• {l}" for l in learnings)
+    else:
+        learnings_text = "No learnings yet — this improves automatically as you use the chat."
 
-    # Build Gemini chat history (list of Content objects)
+    system = (
+        _SYSTEM_PROMPT
+        .replace("{context}", context)
+        .replace("{learnings}", learnings_text)
+    )
+
+    # Build Gemini chat history
     chat_history = []
     for msg in history[:-1]:  # exclude the latest user message (sent separately)
         role = "user" if msg["role"] == "user" else "model"
@@ -87,7 +151,6 @@ def get_response(history: list, user_msg: str, context: str) -> tuple:
             action = json.loads(action_match.group(1))
         except json.JSONDecodeError:
             pass
-        # Remove action tag from displayed text
         text = re.sub(r"\[ACTION:\s*\{.*?\}\]", "", text, flags=re.DOTALL).strip()
 
     return text, action

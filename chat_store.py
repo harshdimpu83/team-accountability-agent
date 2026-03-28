@@ -48,3 +48,29 @@ def clear_chat(target_date: date):
         _client().delete_object(Bucket=os.getenv("BUCKET_NAME"), Key=_key(target_date))
     except Exception:
         pass
+
+
+_LEARNINGS_KEY = "team-accountability/learnings.json"
+_MAX_LEARNINGS = 100
+
+
+def load_learnings() -> list:
+    """Load persistent learnings list from R2. Returns [] if none exist yet."""
+    try:
+        resp = _client().get_object(Bucket=os.getenv("BUCKET_NAME"), Key=_LEARNINGS_KEY)
+        return json.loads(resp["Body"].read().decode("utf-8"))
+    except Exception:
+        return []
+
+
+def save_learnings(learnings: list):
+    """Save learnings to R2, keeping only the latest MAX_LEARNINGS entries."""
+    try:
+        _client().put_object(
+            Bucket=os.getenv("BUCKET_NAME"),
+            Key=_LEARNINGS_KEY,
+            Body=json.dumps(learnings[-_MAX_LEARNINGS:], indent=2),
+            ContentType="application/json",
+        )
+    except Exception:
+        pass

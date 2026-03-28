@@ -10,8 +10,8 @@ from gmail_reader import fetch_emails_for_member, classify_emails
 from ai_analyzer import analyze_member_tasks
 from backlink_analyzer import fetch_all_sheets, filter_backlinks, fetch_page_data, analyze_backlink, score_color
 from settings_store import load_settings, save_settings
-from chat_store import load_chat, save_chat, clear_chat
-from chat_assistant import build_context, get_response
+from chat_store import load_chat, save_chat, clear_chat, load_learnings, save_learnings
+from chat_assistant import build_context, get_response, extract_learnings
 
 load_dotenv()
 
@@ -438,9 +438,11 @@ with chat_tab:
     st.subheader("💬 AI Assistant")
     st.caption("Ask questions about your team, backlink results, or get SEO advice.")
 
-    # Load today's chat history from R2 into session_state (once per session)
+    # Load today's chat history and learnings from R2 (once per session)
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = load_chat(date.today())
+    if "chat_learnings" not in st.session_state:
+        st.session_state["chat_learnings"] = load_learnings()
 
     # ── Clear chat button ──
     col_title, col_clear = st.columns([5, 1])
@@ -459,6 +461,19 @@ with chat_tab:
     user_input = st.chat_input("Ask me anything — team, backlinks, SEO advice...")
 
     if user_input:
+        # ── Daily learning extraction (runs once per day on first message) ──
+        if not st.session_state.get("learnings_updated_today"):
+            yesterday = date.today() - timedelta(days=1)
+            yesterday_history = load_chat(yesterday)
+            if yesterday_history:
+                with st.spinner("Reviewing yesterday's conversation to improve responses..."):
+                    new_learnings = extract_learnings(yesterday_history)
+                    if new_learnings:
+                        updated = st.session_state["chat_learnings"] + new_learnings
+                        save_learnings(updated)
+                        st.session_state["chat_learnings"] = updated[-100:]
+            st.session_state["learnings_updated_today"] = True
+
         # Add user message
         st.session_state["chat_history"].append({"role": "user", "content": user_input})
         with st.chat_message("user"):
@@ -475,7 +490,10 @@ with chat_tab:
             with st.spinner("Thinking..."):
                 try:
                     reply, action = get_response(
-                        st.session_state["chat_history"], user_input, context
+                        st.session_state["chat_history"],
+                        user_input,
+                        context,
+                        st.session_state.get("chat_learnings"),
                     )
                 except Exception as e:
                     reply = f"Sorry, I ran into an error: {e}"
