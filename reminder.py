@@ -34,10 +34,15 @@ EVENING_BODY = (
 )
 
 
+CC_EMAILS = ["harsh.vyas84@gmail.com", "tbmseoteam@gmail.com"]
+
+
 def send_email(to_email: str, to_name: str, subject: str, body: str):
+    cc_list = [{"email": e} for e in CC_EMAILS if e.lower() != to_email.lower()]
     payload = {
         "sender": {"name": "Team Accountability Agent", "email": BREVO_SENDER_EMAIL},
         "to": [{"email": to_email, "name": to_name}],
+        "cc": cc_list,
         "subject": subject,
         "textContent": body,
     }
