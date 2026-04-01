@@ -65,10 +65,10 @@ def _brevo_send(subject: str, html_body: str, to_email: str, to_name: str):
     if not api_key:
         raise ValueError("BREVO_API_KEY not set")
 
-    cc_list = [{"email": "tbmseoteam@gmail.com"}]
-    if cc_email and cc_email.lower() != to_email.lower():
-        cc_list.append({"email": cc_email})
-    cc_list = [e for e in cc_list if e["email"].lower() != to_email.lower()]
+    cc_addresses = ["harsh.vyas84@gmail.com", "tbmseoteam@gmail.com"]
+    if cc_email and cc_email not in cc_addresses:
+        cc_addresses.append(cc_email)
+    cc_list = [{"email": e} for e in cc_addresses if e.lower() != to_email.lower()]
 
     payload = {
         "sender": {"name": "Team Accountability Agent", "email": sender_email},
